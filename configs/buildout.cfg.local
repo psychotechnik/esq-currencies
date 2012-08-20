@@ -1,0 +1,104 @@
+[buildout]
+
+extends=esq-currencies/configs/buildout_base.cfg
+
+venv_dir = /var/local/venv
+download_cache_dir = /var/local/buildout
+eggs-directory=${buildout:download_cache_dir}/eggs
+download-cache = ${buildout:download_cache_dir}/cache
+run-dir = ${buildout:directory}/var/run
+spool-dir = ${buildout:directory}/var/spool
+
+parts += uwsgi
+         resetdb
+         spool-dir
+         run-dir
+         log-dir
+         set-permissions
+         uwsgi-touch-to-reload
+         bash-aliases
+
+eggs += 
+       ipdb
+       ipython
+       winpdb
+       django_extensions
+       django-debug-toolbar
+
+[server]
+host=pk.esq.uberbits.co
+venv_name=esq-currencies
+user=www-data
+socket-port=7089
+db_name = esq-currencies
+db_user = web
+db_host = 127.0.0.1
+supervisor-conf-path = /etc/supervisor/conf.d
+
+[uwsgi]
+recipe=eqb.recipe.uwsgi
+uid=${server:user}
+home=${buildout:directory}
+wsgi-file=${buildout:bin-directory}/django.wsgi
+env=DJANGO_SETTINGS_MODULE=esq-currencies.settings
+pidfile=${buildout:run-dir}/${server:host}.pid
+socket=127.0.0.1:${server:socket-port}
+single-interpreter=true
+master=True
+eggs=Django
+versions=versions
+daemonize=${buildout:directory}/log/uwsgi.log
+#touch-logreopen=True
+touch-reload=${buildout:spool-dir}/touchme.to.reload
+log-master=true
+spooler = ${buildout:spool-dir}
+import=uwsgiutils.tasks
+#import=uwsgiutils.tasks_localdev
+
+[log-dir]
+recipe = z3c.recipe.mkdir
+paths = log
+
+[spool-dir]
+recipe = z3c.recipe.mkdir
+paths = var/spool
+
+[run-dir]
+recipe = z3c.recipe.mkdir
+paths = var/run
+
+[set-permissions]
+recipe = cp.recipe.cmd
+shell = /bin/bash
+install_cmd = 
+    sudo chown ${server:user} -R ${buildout:directory}/var
+    sudo chown ${server:user} -R ${buildout:directory}/log
+update_cmd = ${set-permissions:install_cmd}
+
+[uwsgi-touch-to-reload]
+recipe = collective.recipe.template
+output = ${buildout:spool-dir}/touchme.to.reload
+inline =
+
+[bash-aliases]
+recipe = collective.recipe.template
+output = ${buildout:parts-directory}/etc/${server:venv_name}.bash.aliases
+inline = 
+    alias run${server:venv_name}='sudo su root -c "${buildout:bin-directory}/uwsgi  --workers=1 --xml=${buildout:parts-directory}/uwsgi/uwsgi.xml"'
+    #alias restart-${server:venv_name}='sudo kill -HUP `cat ${uwsgi:pidfile}`'
+    alias restart-${server:venv_name}='touch ${buildout:spool-dir}/touchme.to.reload'
+    alias stop-${server:venv_name}='sudo kill -INT `cat ${uwsgi:pidfile}`'
+    alias tail-${server:venv_name}='multitail ${buildout:directory}/log/${server:venv_name}.log ${buildout:directory}/log/uwsgi.log'
+
+
+[resetdb]
+recipe = collective.recipe.template
+output = ${buildout:bin-directory}/resetdb
+mode = 755
+inline =
+    sudo su postgres -c "dropdb ${server:db_name}"
+    sudo su postgres -c "createdb -O ${server:db_user} -h ${server:db_host} -D pg_default -E UTF8 -l en_US.UTF-8 ${server:db_name}"
+    sudo su postgres -c "psql -U ${server:db_user} -h ${server:db_host} ${server:db_name} < $VIRTUAL_ENV/${server:db_name}.latest.sql"
+
+
+

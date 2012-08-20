@@ -1,0 +1,26 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+
+{% block title %}{{ title }} | {% trans 'Esquire Group Currencies' %}{% endblock %}
+
+{% comment %}
+{% block extrastyle %} {% endblock %}
+<style type="text/css">
+
+#header #branding h1 {
+    margin: 0;
+    padding: 5px 10px;
+    text-indent: -9999px;
+    height: 31px;
+    width: 93px;
+}
+</style>
+
+
+{% endcomment %}
+
+{% block branding %}
+
+<h1 id="site-name">{% trans 'esquire group' %}</h1>
+{% endblock %}
